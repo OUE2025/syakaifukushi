@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   CheckCircle2,
@@ -30,6 +30,9 @@ const retryMessages = [
   '焦らず一歩ずつ！次はきっと大丈夫です💪',
 ];
 
+const circledDigits = ['⓪','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+const formatCircleNumber = (n) => (n >= 0 && n < circledDigits.length ? circledDigits[n] : `${n}.`);
+
 const shuffleArray = (arr) => {
   const cloned = [...arr];
   for (let i = cloned.length - 1; i > 0; i -= 1) {
@@ -47,26 +50,27 @@ const prepareSessionQuestions = (base, filter, countOption) => {
 
 const Header = ({ hasStarted, onOpenSettings }) => (
   <header
-    className={`bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center flex-shrink-0 ${
+    className={`relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center flex-shrink-0 ${
       hasStarted ? 'px-4 py-3 md:px-5 md:py-3' : 'p-5 md:p-6'
     }`}
   >
     {!hasStarted && (
+      <a
+        href={`${import.meta.env.BASE_URL}notice.html`}
+        target="_blank"
+        rel="noreferrer"
+        className="absolute top-4 right-4 text-xs md:text-sm font-semibold bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-full px-3 py-1"
+      >
+        注意事項・免責事項
+      </a>
+    )}
+    {!hasStarted && (
       <>
-        <div className="flex justify-center mb-2">
+        <div className="flex justify-center mb-2 mt-2 md:mt-0">
           <GraduationCap size={40} className="text-indigo-200" />
         </div>
         <h1 className="text-2xl font-bold">第37回 社会福祉士国家試験</h1>
-        <p className="text-indigo-100 opacity-90 text-sm md:text-base">令和年度 過去問演習クエスト</p>
-        <div className="mt-3 flex justify-center">
-          <button
-            onClick={onOpenSettings}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold rounded-full border border-white/30"
-          >
-            <Settings size={16} />
-            設定
-          </button>
-        </div>
+        <p className="text-indigo-100 opacity-90 text-sm md:text-base">過去問演習クエスト</p>
       </>
     )}
     {hasStarted && <h1 className="text-lg md:text-xl font-bold">第37回 社会福祉士国家試験</h1>}
@@ -92,9 +96,6 @@ const SettingsModal = ({
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Settings size={18} /> 設定
           </h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-800 text-sm font-semibold">
-            閉じる
-          </button>
         </div>
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <input type="checkbox" checked={modalTimeLimitEnabled} onChange={onChangeTimeEnabled} />
@@ -148,30 +149,11 @@ const SettingsModal = ({
     </div>
   ) : null;
 
-const FilterBar = ({
-  filter,
-  onChangeFilter,
-  currentIndex,
-  total,
-  score,
-  timeLimitEnabled,
-  remainingSeconds,
-  onAbort,
-}) => (
+const FilterBar = ({ filter, onChangeFilter, currentIndex, total, score, timeLimitEnabled, remainingSeconds, onAbort, disableFilter }) => (
   <div className="p-3 md:p-4 bg-indigo-50 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 flex-shrink-0">
     <div className="flex items-center gap-2">
       <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">科目:</span>
-      <select
-        value={filter}
-        onChange={(e) => onChangeFilter(e.target.value)}
-        className="bg-white border border-indigo-200 rounded-full px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-      >
-        {categories.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
+      <span className="text-sm font-semibold text-slate-700">{filter}</span>
     </div>
     <div className="flex items-center gap-4 text-sm font-semibold text-indigo-700">
       <div className="flex items-center gap-1">
@@ -200,27 +182,88 @@ const FilterBar = ({
   </div>
 );
 
-const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, onClose }) =>
-  open && encouragement ? (
+const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose, onOpenExplanation }) =>
+  open && encouragement && detail ? (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-40 px-4">
       <div
         className={`w-full max-w-md rounded-3xl p-5 shadow-2xl border ${
           lastAnswerCorrect ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'
         }`}
       >
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5">
-            {lastAnswerCorrect ? <CheckCircle2 className="text-green-500" size={28} /> : <XCircle className="text-orange-500" size={28} />}
-          </div>
+        <div className="flex flex-col items-center text-center gap-3">
+          <img
+            src={`${import.meta.env.BASE_URL}img/${lastAnswerCorrect ? 'ok.webp' : 'ng.webp'}`}
+            alt={lastAnswerCorrect ? '正解' : '不正解'}
+            className="w-28 h-28 object-contain"
+          />
           <div className="space-y-2">
-            <h3 className="text-lg font-bold text-slate-800">{lastAnswerCorrect ? '正解です！' : '不正解です'}</h3>
             <p className="text-sm text-slate-700 leading-relaxed">{encouragement}</p>
+            <div className="text-xs text-slate-600 space-y-1 text-left">
+              <div>
+                <span className="font-bold text-slate-800 mr-1">正解:</span>
+                <span className="inline-block">
+                  {detail.correct.map((idx) => `${formatCircleNumber(idx + 1)} ${detail.question.options[idx]}`).join(' / ')}
+                </span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-800 mr-1">あなたの回答:</span>
+                <span className="inline-block">
+                  {detail.selected.length > 0
+                    ? detail.selected.map((idx) => `${formatCircleNumber(idx + 1)} ${detail.question.options[idx]}`).join(' / ')
+                    : '未選択'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            onClick={detail?.question ? onOpenExplanation : undefined}
+            disabled={!detail?.question}
+            className="w-full px-4 py-3 rounded-xl bg-white hover:bg-slate-50 text-indigo-700 font-semibold border border-indigo-200 shadow-sm disabled:opacity-50"
+          >
+            解説を見る
+          </button>
           <button
             onClick={onClose}
             className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
+          >
+            次の問題へ
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+const ExplanationPopup = ({ open, detail, onClose }) =>
+  open && detail ? (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+      <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div className="text-sm text-slate-500">解説</div>
+        <div className="text-base font-bold text-slate-800 leading-relaxed max-h-32 overflow-auto">
+          {detail.question.question}
+        </div>
+        <div className="space-y-2 text-sm text-slate-700">
+          <div className="font-semibold text-slate-900">正解</div>
+          <div className="space-y-1">
+            {detail.correct.map((idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <span className="font-bold text-indigo-600">{formatCircleNumber(idx + 1)}</span>
+                <span className="flex-1">{detail.question.options[idx]}</span>
+              </div>
+            ))}
+          </div>
+          <div className="pt-2">
+            <div className="font-semibold text-slate-900 mb-1">解説</div>
+            <div className="text-slate-700 leading-relaxed">
+              {detail.question.explanation || '解説は準備中です。'}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
           >
             閉じる
           </button>
@@ -229,32 +272,63 @@ const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, onClose }) =>
     </div>
   ) : null;
 
-const StartScreen = ({ totalCount, onStart, onOpenSettings }) => (
-  <div className="text-center space-y-5 py-2 h-full flex flex-col items-center justify-center">
-    <div className="relative inline-block">
-      <div className="absolute inset-0 bg-indigo-400 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-      <div className="relative bg-white p-5 rounded-full border-4 border-indigo-400 shadow-xl inline-flex items-center justify-center w-28 h-28 text-4xl text-indigo-600">
-        <BookOpen size={40} />
+const BannerAd = ({ marginClass = '' }) => (
+  <div className={`flex justify-center ${marginClass}`}>
+    <a href="https://plus1jp.com/" target="_blank" rel="noreferrer">
+      <img
+        src={`${import.meta.env.BASE_URL}img/smileone.webp`}
+        alt="smileone"
+        className="w-full max-w-md rounded-2xl shadow-md border border-slate-200"
+      />
+    </a>
+  </div>
+);
+
+const StartScreen = ({ totalCount, filter, onChangeFilter, onStart, onOpenSettings, timeLimitEnabled }) => (
+  <div className="text-center py-10 md:py-14 h-full flex flex-col items-center">
+    <div className="flex flex-col items-center space-y-5">
+      <div className="relative inline-block">
+        <div className="absolute inset-0 bg-indigo-400 rounded-full blur-2xl opacity-20 animate-pulse"></div>
+        <div className="relative bg-white p-4 rounded-full border-4 border-indigo-400 shadow-xl inline-flex items-center justify-center w-24 h-24 text-4xl text-indigo-600">
+          <BookOpen size={32} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <h2 className="text-xl md:text-2xl font-black text-slate-800">演習をはじめよう</h2>
+        <div className="flex flex-col items-center gap-2">
+          <label className="text-xs font-semibold text-slate-600">科目を選択</label>
+          <select
+            value={filter}
+            onChange={(e) => onChangeFilter(e.target.value)}
+            className="bg-white border border-indigo-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <p className="text-slate-500 text-sm md:text-base">
+            全 {totalCount} 問 / 制限時間オプション{timeLimitEnabled ? 'あり' : 'なし'}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row gap-3 justify-center">
+        <button
+          onClick={onStart}
+          className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 text-sm md:text-base"
+        >
+          スタート
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className="px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-200 text-sm md:text-base"
+        >
+          設定を開く
+        </button>
       </div>
     </div>
-    <div className="space-y-2">
-      <h2 className="text-xl md:text-2xl font-black text-slate-800">演習をはじめよう</h2>
-      <p className="text-slate-500 text-sm md:text-base">全 {totalCount} 問 / 科目 {categories.length - 1} / 制限時間オプションあり</p>
-    </div>
-    <div className="flex flex-col md:flex-row gap-3 justify-center">
-      <button
-        onClick={onStart}
-        className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg shadow-indigo-200 text-sm md:text-base"
-      >
-        スタート
-      </button>
-      <button
-        onClick={onOpenSettings}
-        className="px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-200 text-sm md:text-base"
-      >
-        設定を開く
-      </button>
-    </div>
+    <BannerAd marginClass="mt-[100px]" />
   </div>
 );
 
@@ -268,86 +342,105 @@ const QuestionScreen = ({
   handleNext,
   currentQuestionIndex,
   activeLength,
-}) => (
-  <div className="flex flex-col gap-4 h-full">
-    <div className="space-y-2 flex-shrink-0">
-      <div className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-widest">
-        {currentQuestion.category}
-      </div>
-      <div className="text-base md:text-lg font-bold leading-snug max-h-16 overflow-auto pr-1">
-        <span className="font-extrabold mr-1">問題 {currentQuestion.id}:</span>
-        <span>{currentQuestion.question}</span>
-      </div>
-      {isMultiple && (
-        <p className="text-rose-500 text-sm font-bold flex items-center gap-1">
-          <CheckCircle2 size={14} /> ※この問題は正解が複数あります。
-        </p>
-      )}
-    </div>
+}) => {
+  const questionRef = useRef(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
 
-    <div className="space-y-2">
-      {currentQuestion.options.map((option, idx) => {
-        const isSelected = selectedOptions.includes(idx);
-        const isCorrect = currentQuestion.correct.includes(idx);
+  useEffect(() => {
+    const el = questionRef.current;
+    if (!el) return;
+    const check = () => {
+      setShowScrollHint(el.scrollHeight > el.clientHeight);
+    };
+    check();
+    el.addEventListener('scroll', check);
+    return () => el.removeEventListener('scroll', check);
+  }, [currentQuestion]);
 
-        let buttonClass = 'w-full text-left p-2.5 rounded-2xl border-2 transition-all duration-200 flex items-start gap-2.5 ';
-
-        if (showResult) {
-          if (isCorrect) {
-            buttonClass += 'border-green-500 bg-green-50 text-green-800';
-          } else if (isSelected && !isCorrect) {
-            buttonClass += 'border-rose-500 bg-rose-50 text-rose-800';
-          } else {
-            buttonClass += 'border-slate-100 bg-white opacity-50';
-          }
-        } else {
-          buttonClass += isSelected
-            ? 'border-indigo-500 bg-indigo-50 text-indigo-800 shadow-md transform -translate-y-1'
-            : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50';
-        }
-
-        return (
-          <button key={idx} onClick={() => handleOptionToggle(idx)} disabled={showResult} className={buttonClass}>
-            <span
-              className={`mt-1 flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full border-2 text-xs font-bold ${
-                isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 text-slate-400'
-              }`}
-            >
-              {idx + 1}
-            </span>
-            <span className="flex-grow leading-snug break-words" style={{ fontSize: 'clamp(12px, 2.2vw, 15px)' }}>
-              {option}
-            </span>
-            {showResult && isCorrect && <CheckCircle2 className="text-green-500 flex-shrink-0" size={20} />}
-            {showResult && isSelected && !isCorrect && <XCircle className="text-rose-500 flex-shrink-0" size={20} />}
-          </button>
-        );
-      })}
-    </div>
-
-    <div className="pt-3 border-t border-slate-100 flex flex-col items-center gap-3 flex-shrink-0">
-      <div className="w-full flex justify-between gap-4">
-        {!showResult ? (
-          <button
-            onClick={handleSubmit}
-            disabled={selectedOptions.length === 0}
-            className="flex-grow bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
-          >
-            回答する
-          </button>
-        ) : (
-          <button
-            onClick={handleNext}
-            className="flex-grow bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-purple-200 flex items-center justify-center gap-2"
-          >
-            {currentQuestionIndex < activeLength - 1 ? '次の問題へ' : '結果を見る'}
-            <ChevronRight size={20} />
-          </button>
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      <div className="space-y-2 flex-shrink-0 relative pb-8">
+        <div className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-widest">
+          {currentQuestion.category}
+        </div>
+        <div
+          ref={questionRef}
+          className="text-base md:text-lg font-bold leading-snug max-h-16 overflow-auto pr-1 md:max-h-none md:overflow-visible"
+        >
+          <span className="font-extrabold mr-1">問題 {currentQuestion.id}:</span>
+          <span>{currentQuestion.question}</span>
+        </div>
+        {showScrollHint && (
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 pointer-events-none">▼</div>
+        )}
+        {isMultiple && (
+          <p className="text-rose-500 text-sm font-bold flex items-center gap-1">
+            <CheckCircle2 size={14} /> ※この問題は正解が複数あります。
+          </p>
         )}
       </div>
+
+      <div className="space-y-2 mt-2">
+        {currentQuestion.options.map((option, idx) => {
+          const isSelected = selectedOptions.includes(idx);
+          const isCorrect = currentQuestion.correct.includes(idx);
+
+          let buttonClass = 'w-full text-left p-2.5 rounded-2xl border-2 transition-all duration-200 flex items-start gap-2.5 ';
+
+          if (showResult) {
+            if (isCorrect) {
+              buttonClass += 'border-green-500 bg-green-50 text-green-800';
+            } else if (isSelected && !isCorrect) {
+              buttonClass += 'border-rose-500 bg-rose-50 text-rose-800';
+            } else {
+              buttonClass += 'border-slate-100 bg-white opacity-50';
+            }
+          } else {
+            buttonClass += isSelected
+              ? 'border-indigo-500 bg-indigo-50 text-indigo-800 shadow-md transform -translate-y-1'
+              : 'border-slate-100 bg-white hover:border-indigo-200 hover:bg-slate-50';
+          }
+
+          return (
+            <button key={idx} onClick={() => handleOptionToggle(idx)} disabled={showResult} className={buttonClass}>
+              <span
+                className={`mt-1 flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full border-2 text-xs font-bold ${
+                  isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 text-slate-400'
+                }`}
+              >
+                {idx + 1}
+              </span>
+              <span className="flex-grow leading-snug break-words" style={{ fontSize: 'clamp(12px, 2.2vw, 15px)' }}>
+                {option}
+              </span>
+              {showResult && isCorrect && <CheckCircle2 className="text-green-500 flex-shrink-0" size={20} />}
+              {showResult && isSelected && !isCorrect && <XCircle className="text-rose-500 flex-shrink-0" size={20} />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="pt-3 border-t border-slate-100 flex flex-col items-center gap-3 flex-shrink-0">
+        <div className="w-full flex justify-between gap-4">
+          {!showResult ? (
+            <button
+              onClick={handleSubmit}
+              disabled={selectedOptions.length === 0}
+              className="flex-grow bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-2xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+            >
+              回答する
+            </button>
+          ) : (
+            <div className="flex-grow text-center text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-2xl py-3">
+              判定結果を確認し、ポップアップを閉じて次へ進んでください
+            </div>
+          )}
+        </div>
+      </div>
+      <BannerAd marginClass="mt-[100px]" />
     </div>
-  </div>
-);
+  );
+};
 
 const ResultScreen = ({ score, accuracy, rank, onRestart, onBackToStart }) => (
   <div className="text-center space-y-8 py-4">
@@ -419,6 +512,8 @@ const App = () => {
   const [modalQuestionCountOption, setModalQuestionCountOption] = useState('all');
   const [sessionQuestions, setSessionQuestions] = useState([]);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [popupDetail, setPopupDetail] = useState(null);
+  const [showExplanationPopup, setShowExplanationPopup] = useState(false);
 
   const filteredQuestions = useMemo(
     () => (filter === 'すべて' ? rawQuestions : rawQuestions.filter((q) => q.category === filter)),
@@ -446,6 +541,8 @@ const App = () => {
     setRemainingSeconds(timeLimitSeconds);
     setSessionQuestions([]);
     setShowFeedbackPopup(false);
+    setPopupDetail(null);
+    setShowExplanationPopup(false);
   };
 
   const handleStart = () => {
@@ -496,6 +593,11 @@ const App = () => {
     );
     if (isCorrect) setScore((prev) => prev + 1);
 
+    setPopupDetail({
+      question: currentQuestion,
+      selected: selectedOptions,
+      correct: currentQuestion.correct,
+    });
     setLastAnswerCorrect(isCorrect);
     setShowResult(true);
     setShowFeedbackPopup(true);
@@ -510,6 +612,7 @@ const App = () => {
       setLastAnswerCorrect(null);
       setRemainingSeconds(timeLimitSeconds);
       setShowFeedbackPopup(false);
+      setShowExplanationPopup(false);
     } else {
       setIsFinished(true);
     }
@@ -525,6 +628,12 @@ const App = () => {
   };
 
   const accuracy = activeQuestions.length ? Math.round((score / activeQuestions.length) * 100) : 0;
+  const displayTotalCount =
+    filter === 'すべて'
+      ? questionCountOption === 'all'
+        ? rawQuestions.length
+        : Math.min(Number(questionCountOption), rawQuestions.length)
+      : filteredQuestions.length;
 
   useEffect(() => {
     if (showSettings) {
@@ -554,12 +663,6 @@ const App = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [timeLimitEnabled, currentQuestion, showResult, isFinished, hasStarted, timeLimitSeconds]);
-
-  useEffect(() => {
-    if (!showFeedbackPopup) return;
-    const t = setTimeout(() => setShowFeedbackPopup(false), 2500);
-    return () => clearTimeout(t);
-  }, [showFeedbackPopup]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 md:p-6 font-sans text-slate-800 overflow-hidden">
@@ -600,6 +703,7 @@ const App = () => {
             timeLimitEnabled={timeLimitEnabled}
             remainingSeconds={remainingSeconds}
             onAbort={handleBackToStart}
+            disableFilter
           />
         )}
 
@@ -607,15 +711,27 @@ const App = () => {
           open={showFeedbackPopup}
           encouragement={encouragement}
           lastAnswerCorrect={lastAnswerCorrect}
-          onClose={() => setShowFeedbackPopup(false)}
+          detail={popupDetail}
+          onClose={() => {
+            setShowFeedbackPopup(false);
+            if (!isFinished) {
+              handleNext();
+            }
+          }}
+          onOpenExplanation={() => setShowExplanationPopup(true)}
         />
+
+        <ExplanationPopup open={showExplanationPopup} detail={popupDetail} onClose={() => setShowExplanationPopup(false)} />
 
         <main className="p-4 md:p-6 flex-1 overflow-auto">
           {!hasStarted ? (
             <StartScreen
-              totalCount={filter === 'すべて' ? rawQuestions.length : filteredQuestions.length}
+              totalCount={displayTotalCount}
+              filter={filter}
+              onChangeFilter={setFilter}
               onStart={handleStart}
               onOpenSettings={() => setShowSettings(true)}
+              timeLimitEnabled={timeLimitEnabled}
             />
           ) : !isFinished && currentQuestion ? (
             <QuestionScreen
