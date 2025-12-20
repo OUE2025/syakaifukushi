@@ -14,6 +14,8 @@ import { examSets, defaultExamKey } from './questions';
 import okImage from '../img/ok.webp';
 import ngImage from '../img/ng.webp';
 import smileImage from '../img/smileone.webp';
+import snoopyOkImage from '../img/sn01.webp';
+import snoopyNgImage from '../img/sn02.webp';
 
 const DEFAULT_EXAM_KEY = defaultExamKey || Object.keys(examSets)[0] || '';
 const questionCountOptions = ['all', 10, 20, 30, 50, 100];
@@ -178,14 +180,18 @@ const SettingsModal = ({
   modalTimeLimitEnabled,
   modalTimeLimitSeconds,
   modalQuestionCountOption,
+  modalIllustrationMode,
   onClose,
   onCancel,
   onChangeTimeEnabled,
   onChangeTimeSeconds,
   onChangeQuestionCount,
+  onChangeIllustrationMode,
   onApply,
-}) =>
-  open ? (
+}) => {
+  if (!open) return null;
+
+  return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
@@ -193,10 +199,12 @@ const SettingsModal = ({
             <Settings size={18} /> 設定
           </h3>
         </div>
+
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <input type="checkbox" checked={modalTimeLimitEnabled} onChange={onChangeTimeEnabled} />
           回答制限時間を使う
         </label>
+
         <div className="text-sm text-slate-700">
           <div className="mb-2 font-semibold">制限時間</div>
           <div className="flex gap-2">
@@ -214,6 +222,7 @@ const SettingsModal = ({
             ))}
           </div>
         </div>
+
         <div className="text-sm text-slate-700">
           <div className="mb-2 font-semibold">出題数（「すべて」選択時のみ適用）</div>
           <div className="flex flex-wrap gap-2">
@@ -230,6 +239,27 @@ const SettingsModal = ({
             ))}
           </div>
         </div>
+
+        <div className="text-sm text-slate-700">
+          <div className="mb-2 font-semibold">正解・不正解イラスト</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'normal', label: '通常' },
+              { key: 'special', label: 'SPECIAL' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => onChangeIllustrationMode(opt.key)}
+                className={`px-3 py-2 rounded-xl border text-sm font-semibold ${
+                  modalIllustrationMode === opt.key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-slate-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onCancel}
@@ -243,8 +273,8 @@ const SettingsModal = ({
         </div>
       </div>
     </div>
-  ) : null;
-
+  );
+};
 const FilterBar = ({ filter, currentIndex, total, score, timeLimitEnabled, remainingSeconds, onAbort }) => (
   <div className="p-3 md:p-4 bg-indigo-50 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 flex-shrink-0">
     <div className="flex items-center gap-2">
@@ -278,7 +308,17 @@ const FilterBar = ({ filter, currentIndex, total, score, timeLimitEnabled, remai
   </div>
 );
 
-const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose, onOpenExplanation }) =>
+const FeedbackPopup = ({
+  open,
+  encouragement,
+  lastAnswerCorrect,
+  detail,
+  onClose,
+  onOpenExplanation,
+  successImage,
+  failureImage,
+  isSpecialIllustration,
+}) =>
   open && encouragement && detail ? (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-40 px-4">
       <div
@@ -288,9 +328,9 @@ const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose
       >
         <div className="flex flex-col items-center text-center gap-3">
           <img
-            src={lastAnswerCorrect ? okImage : ngImage}
+            src={lastAnswerCorrect ? successImage : failureImage}
             alt={lastAnswerCorrect ? '正解' : '不正解'}
-            className="w-32 h-32 object-contain"
+            className={`${isSpecialIllustration ? 'w-full h-auto max-w-md' : 'w-32 h-32'} object-contain`}
           />
           <div className="space-y-2">
             <p className="text-sm text-slate-700 leading-relaxed">{encouragement}</p>
@@ -636,6 +676,8 @@ const App = () => {
   const [modalTimeLimitSeconds, setModalTimeLimitSeconds] = useState(timeLimitSeconds);
   const [questionCountOption, setQuestionCountOption] = useState('all');
   const [modalQuestionCountOption, setModalQuestionCountOption] = useState('all');
+  const [illustrationMode, setIllustrationMode] = useState('normal');
+  const [modalIllustrationMode, setModalIllustrationMode] = useState('normal');
   const [sessionQuestions, setSessionQuestions] = useState([]);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const [popupDetail, setPopupDetail] = useState(null);
@@ -679,6 +721,8 @@ const App = () => {
   const activeQuestions = hasStarted ? sessionQuestions : filteredQuestions;
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? null;
   const isMultiple = currentQuestion?.correct.length > 1;
+  const successImage = illustrationMode === 'special' ? snoopyOkImage : okImage;
+  const failureImage = illustrationMode === 'special' ? snoopyNgImage : ngImage;
   const handleExamChangeRequest = (nextKey) => {
     if (nextKey === DEFAULT_EXAM_KEY || unlockedExams.has(nextKey)) {
       setExamKey(nextKey);
@@ -850,8 +894,9 @@ const App = () => {
       setModalTimeLimitEnabled(timeLimitEnabled);
       setModalTimeLimitSeconds(timeLimitSeconds);
       setModalQuestionCountOption(questionCountOption);
+      setModalIllustrationMode(illustrationMode);
     }
-  }, [showSettings, timeLimitEnabled, timeLimitSeconds, questionCountOption]);
+  }, [showSettings, timeLimitEnabled, timeLimitSeconds, questionCountOption, illustrationMode]);
 
   useEffect(() => {
     if (!hasStarted || !timeLimitEnabled || !currentQuestion || showResult || isFinished) return;
@@ -885,21 +930,25 @@ const App = () => {
         modalTimeLimitEnabled={modalTimeLimitEnabled}
         modalTimeLimitSeconds={modalTimeLimitSeconds}
         modalQuestionCountOption={modalQuestionCountOption}
+        modalIllustrationMode={modalIllustrationMode}
         onClose={() => setShowSettings(false)}
         onCancel={() => {
           setShowSettings(false);
           setModalTimeLimitEnabled(timeLimitEnabled);
           setModalTimeLimitSeconds(timeLimitSeconds);
           setModalQuestionCountOption(questionCountOption);
+          setModalIllustrationMode(illustrationMode);
         }}
         onChangeTimeEnabled={(e) => setModalTimeLimitEnabled(e.target.checked)}
         onChangeTimeSeconds={(sec) => setModalTimeLimitSeconds(sec)}
         onChangeQuestionCount={(opt) => setModalQuestionCountOption(opt)}
+        onChangeIllustrationMode={(mode) => setModalIllustrationMode(mode)}
         onApply={() => {
           setTimeLimitEnabled(modalTimeLimitEnabled);
           setTimeLimitSeconds(modalTimeLimitSeconds);
           setRemainingSeconds(modalTimeLimitSeconds);
           setQuestionCountOption(modalQuestionCountOption);
+          setIllustrationMode(modalIllustrationMode);
           setShowSettings(false);
         }}
       />
@@ -930,6 +979,9 @@ const App = () => {
           encouragement={encouragement}
           lastAnswerCorrect={lastAnswerCorrect}
           detail={popupDetail}
+          successImage={successImage}
+          failureImage={failureImage}
+          isSpecialIllustration={illustrationMode === 'special'}
           onClose={() => {
             setShowFeedbackPopup(false);
             if (!isFinished) {
@@ -1016,3 +1068,4 @@ const App = () => {
 };
 
 export default App;
+
