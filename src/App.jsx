@@ -51,6 +51,38 @@ const prepareSessionQuestions = (base, filter, countOption) => {
   return shuffleArray(base).slice(0, targetCount);
 };
 
+const PasswordModal = ({ open, password, onChange, onSubmit, onCancel, error }) =>
+  open ? (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-md p-6 w-full max-w-sm space-y-4">
+        <h3 className="text-lg font-bold text-slate-900">パスワード入力</h3>
+        <p className="text-sm text-slate-700">選択した回を開くにはパスワードを入力してください。</p>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="パスワード"
+        />
+        {error && <div className="text-xs text-rose-500">{error}</div>}
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold border border-slate-200"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={onSubmit}
+            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
+          >
+            決定
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
 const NoticeModal = ({ open, onClose }) =>
   open ? (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
@@ -113,7 +145,7 @@ const NoticeModal = ({ open, onClose }) =>
     </div>
   ) : null;
 
-const Header = ({ hasStarted, examLabel, onOpenNotice }) => (
+const Header = ({ hasStarted, examLabel, onOpenNotice, onResetUnlock, locked }) => (
   <header
     className={`relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center flex-shrink-0 ${
       hasStarted ? 'px-4 py-3 md:px-5 md:py-3' : 'p-5 md:p-6'
@@ -130,8 +162,8 @@ const Header = ({ hasStarted, examLabel, onOpenNotice }) => (
     )}
     {!hasStarted && (
       <>
-        <div className="flex justify-center mb-2 mt-3 md:mt-0">
-          <GraduationCap size={40} className="text-indigo-200" />
+        <div className="flex justify-center mb-2 mt-3 md:mt-0" onDoubleClick={onResetUnlock}>
+          <GraduationCap size={40} className={locked ? 'text-rose-200' : 'text-indigo-200'} />
         </div>
         <h1 className="text-2xl font-bold">社会福祉士国家試験</h1>
         <p className="text-indigo-100 opacity-90 text-sm md:text-base">過去問演習クエスト</p>
@@ -372,31 +404,37 @@ const StartScreen = ({
         <h2 className="text-xl md:text-2xl font-black text-slate-800">演習をはじめよう</h2>
         <div className="flex flex-col items-center gap-2">
           <label className="text-xs font-semibold text-slate-600">試験回を選択</label>
-          <select
-            value={examKey}
-            onChange={(e) => onChangeExam(e.target.value)}
-            className="bg-white border border-indigo-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            {examOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={examKey}
+              onChange={(e) => onChangeExam(e.target.value)}
+              className="appearance-none bg-white border border-indigo-200 rounded-full px-4 pr-12 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              {examOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-500 text-xs">▼</span>
+          </div>
         </div>
         <div className="flex flex-col items-center gap-2">
           <label className="text-xs font-semibold text-slate-600">科目を選択</label>
-          <select
-            value={filter}
-            onChange={(e) => onChangeFilter(e.target.value)}
-            className="bg-white border border-indigo-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={filter}
+              onChange={(e) => onChangeFilter(e.target.value)}
+              className="appearance-none bg-white border border-indigo-200 rounded-full px-4 pr-12 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-500 text-xs">▼</span>
+          </div>
           <p className="text-slate-500 text-sm md:text-base">
             全 {totalCount} 問 / 制限時間オプション{timeLimitEnabled ? 'あり' : 'なし'}
           </p>
@@ -603,9 +641,25 @@ const App = () => {
   const [popupDetail, setPopupDetail] = useState(null);
   const [showExplanationPopup, setShowExplanationPopup] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [pendingExamKey, setPendingExamKey] = useState('');
+  const [unlockedExams, setUnlockedExams] = useState(() => {
+    try {
+      const saved = localStorage.getItem('unlockedExams');
+      if (!saved) return new Set([DEFAULT_EXAM_KEY]);
+      const arr = JSON.parse(saved);
+      return new Set([DEFAULT_EXAM_KEY, ...arr]);
+    } catch {
+      return new Set([DEFAULT_EXAM_KEY]);
+    }
+  });
 
   const rawQuestions = useMemo(() => examSets[examKey] || examSets[DEFAULT_EXAM_KEY] || [], [examKey]);
   const categories = useMemo(() => ['すべて', ...Array.from(new Set(rawQuestions.map((q) => q.category)))], [rawQuestions]);
+  const examOptions = useMemo(() => Object.keys(examSets), []);
+  const isLockedState = unlockedExams.size <= 1;
 
   const filteredQuestions = useMemo(
     () => (filter === 'すべて' ? rawQuestions : rawQuestions.filter((q) => q.category === filter)),
@@ -615,7 +669,16 @@ const App = () => {
   const activeQuestions = hasStarted ? sessionQuestions : filteredQuestions;
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? null;
   const isMultiple = currentQuestion?.correct.length > 1;
-  const examOptions = useMemo(() => Object.keys(examSets), []);
+  const handleExamChangeRequest = (nextKey) => {
+    if (nextKey === DEFAULT_EXAM_KEY || unlockedExams.has(nextKey)) {
+      setExamKey(nextKey);
+      return;
+    }
+    setPendingExamKey(nextKey);
+    setPasswordInput('');
+    setPasswordError('');
+    setShowPasswordModal(true);
+  };
 
   useEffect(() => {
     resetQuiz();
@@ -629,6 +692,15 @@ const App = () => {
     setHasStarted(false);
     setIsFinished(false);
   }, [filter]);
+
+  useEffect(() => {
+    try {
+      const arr = Array.from(unlockedExams).filter((k) => k !== DEFAULT_EXAM_KEY);
+      localStorage.setItem('unlockedExams', JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+  }, [unlockedExams]);
 
   const resetQuiz = () => {
     setCurrentQuestionIndex(0);
@@ -662,6 +734,33 @@ const App = () => {
     setShowSettings(false);
     setRemainingSeconds(modalTimeLimitSeconds);
     setShowFeedbackPopup(false);
+  };
+
+  const handlePasswordSubmit = () => {
+    if (passwordInput !== 'plusone') {
+      setPasswordError('パスワードが違います');
+      return;
+    }
+    const newUnlocked = new Set(unlockedExams);
+    examOptions.forEach((k) => {
+      if (k !== DEFAULT_EXAM_KEY) newUnlocked.add(k);
+    });
+    setUnlockedExams(newUnlocked);
+    if (pendingExamKey) setExamKey(pendingExamKey);
+    setPendingExamKey('');
+    setPasswordInput('');
+    setPasswordError('');
+    setShowPasswordModal(false);
+  };
+
+  const handleResetUnlock = () => {
+    const resetSet = new Set([DEFAULT_EXAM_KEY]);
+    setUnlockedExams(resetSet);
+    setExamKey(DEFAULT_EXAM_KEY);
+    setPendingExamKey('');
+    setPasswordInput('');
+    setPasswordError('');
+    setShowPasswordModal(false);
   };
 
   const handleBackToStart = () => {
@@ -791,7 +890,13 @@ const App = () => {
       />
 
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] flex flex-col">
-        <Header hasStarted={hasStarted} examLabel={examKey} onOpenNotice={() => setShowNotice(true)} />
+        <Header
+          hasStarted={hasStarted}
+          examLabel={examKey}
+          onOpenNotice={() => setShowNotice(true)}
+          onResetUnlock={handleResetUnlock}
+          locked={isLockedState}
+        />
 
         {hasStarted && !isFinished && (
           <FilterBar
@@ -842,7 +947,7 @@ const App = () => {
               timeLimitEnabled={timeLimitEnabled}
               examKey={examKey}
               examOptions={examOptions}
-              onChangeExam={setExamKey}
+              onChangeExam={handleExamChangeRequest}
               categories={categories}
             />
           ) : !isFinished && currentQuestion ? (
@@ -878,6 +983,19 @@ const App = () => {
       </div>
 
       <NoticeModal open={showNotice} onClose={() => setShowNotice(false)} />
+      <PasswordModal
+        open={showPasswordModal}
+        password={passwordInput}
+        onChange={setPasswordInput}
+        onSubmit={handlePasswordSubmit}
+        onCancel={() => {
+          setShowPasswordModal(false);
+          setPendingExamKey('');
+          setPasswordInput('');
+          setPasswordError('');
+        }}
+        error={passwordError}
+      />
     </div>
   );
 };
