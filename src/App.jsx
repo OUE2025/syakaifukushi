@@ -17,6 +17,10 @@ import smileImage from '../img/smileone.webp';
 import snoopyOkImage from '../img/sn01.webp';
 import snoopyNgImage from '../img/sn02.webp';
 
+const allowedIllustrationModes = ['normal', 'special'];
+const normalizeIllustrationMode = (mode) => (allowedIllustrationModes.includes(mode) ? mode : 'normal');
+const isBrowser = typeof window !== 'undefined';
+
 const DEFAULT_EXAM_KEY = defaultExamKey || Object.keys(examSets)[0] || '';
 const questionCountOptions = ['all', 10, 20, 30, 50, 100];
 
@@ -676,8 +680,8 @@ const App = () => {
   const [modalTimeLimitSeconds, setModalTimeLimitSeconds] = useState(timeLimitSeconds);
   const [questionCountOption, setQuestionCountOption] = useState('all');
   const [modalQuestionCountOption, setModalQuestionCountOption] = useState('all');
-  const [illustrationMode, setIllustrationMode] = useState('normal');
-  const [modalIllustrationMode, setModalIllustrationMode] = useState('normal');
+  const [illustrationMode, setIllustrationMode] = useState(() => normalizeIllustrationMode('normal'));
+  const [modalIllustrationMode, setModalIllustrationMode] = useState(() => normalizeIllustrationMode('normal'));
   const [sessionQuestions, setSessionQuestions] = useState([]);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const [popupDetail, setPopupDetail] = useState(null);
@@ -688,6 +692,7 @@ const App = () => {
   const [passwordError, setPasswordError] = useState('');
   const [pendingExamKey, setPendingExamKey] = useState('');
   const [unlockedExams, setUnlockedExams] = useState(() => {
+    if (!isBrowser) return new Set([DEFAULT_EXAM_KEY]);
     try {
       const saved = localStorage.getItem('unlockedExams');
       if (!saved) return new Set([DEFAULT_EXAM_KEY]);
@@ -700,6 +705,7 @@ const App = () => {
   const mainContentRef = useRef(null);
 
   const scrollMainToTop = useCallback(() => {
+    if (!isBrowser) return;
     const target = mainContentRef.current;
     if (target) {
       target.scrollTo({ top: 0, behavior: 'auto' });
@@ -721,8 +727,9 @@ const App = () => {
   const activeQuestions = hasStarted ? sessionQuestions : filteredQuestions;
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? null;
   const isMultiple = currentQuestion?.correct.length > 1;
-  const successImage = illustrationMode === 'special' ? snoopyOkImage : okImage;
-  const failureImage = illustrationMode === 'special' ? snoopyNgImage : ngImage;
+  const isSpecialIllustration = illustrationMode === 'special';
+  const successImage = isSpecialIllustration ? snoopyOkImage : okImage;
+  const failureImage = isSpecialIllustration ? snoopyNgImage : ngImage;
   const handleExamChangeRequest = (nextKey) => {
     if (nextKey === DEFAULT_EXAM_KEY || unlockedExams.has(nextKey)) {
       setExamKey(nextKey);
@@ -748,6 +755,7 @@ const App = () => {
   }, [filter]);
 
   useEffect(() => {
+    if (!isBrowser) return;
     try {
       const arr = Array.from(unlockedExams).filter((k) => k !== DEFAULT_EXAM_KEY);
       localStorage.setItem('unlockedExams', JSON.stringify(arr));
@@ -894,7 +902,7 @@ const App = () => {
       setModalTimeLimitEnabled(timeLimitEnabled);
       setModalTimeLimitSeconds(timeLimitSeconds);
       setModalQuestionCountOption(questionCountOption);
-      setModalIllustrationMode(illustrationMode);
+      setModalIllustrationMode(normalizeIllustrationMode(illustrationMode));
     }
   }, [showSettings, timeLimitEnabled, timeLimitSeconds, questionCountOption, illustrationMode]);
 
@@ -942,13 +950,15 @@ const App = () => {
         onChangeTimeEnabled={(e) => setModalTimeLimitEnabled(e.target.checked)}
         onChangeTimeSeconds={(sec) => setModalTimeLimitSeconds(sec)}
         onChangeQuestionCount={(opt) => setModalQuestionCountOption(opt)}
-        onChangeIllustrationMode={(mode) => setModalIllustrationMode(mode)}
+        onChangeIllustrationMode={(mode) => setModalIllustrationMode(normalizeIllustrationMode(mode))}
         onApply={() => {
           setTimeLimitEnabled(modalTimeLimitEnabled);
           setTimeLimitSeconds(modalTimeLimitSeconds);
           setRemainingSeconds(modalTimeLimitSeconds);
           setQuestionCountOption(modalQuestionCountOption);
-          setIllustrationMode(modalIllustrationMode);
+          const nextMode = normalizeIllustrationMode(modalIllustrationMode);
+          setIllustrationMode(nextMode);
+          setModalIllustrationMode(nextMode);
           setShowSettings(false);
         }}
       />
@@ -976,17 +986,17 @@ const App = () => {
 
         <FeedbackPopup
           open={showFeedbackPopup}
-          encouragement={encouragement}
-          lastAnswerCorrect={lastAnswerCorrect}
-          detail={popupDetail}
-          successImage={successImage}
-          failureImage={failureImage}
-          isSpecialIllustration={illustrationMode === 'special'}
-          onClose={() => {
-            setShowFeedbackPopup(false);
-            if (!isFinished) {
-              handleNext();
-            }
+        encouragement={encouragement}
+        lastAnswerCorrect={lastAnswerCorrect}
+        detail={popupDetail}
+        successImage={successImage}
+        failureImage={failureImage}
+        isSpecialIllustration={isSpecialIllustration}
+        onClose={() => {
+          setShowFeedbackPopup(false);
+          if (!isFinished) {
+            handleNext();
+          }
           }}
           onOpenExplanation={() => setShowExplanationPopup(true)}
         />
