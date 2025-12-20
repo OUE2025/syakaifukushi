@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 // 試験回は questions*.js の自動収集結果（examSets）から取得し、defaultExamKey で最新回を選択
 import { examSets, defaultExamKey } from './questions';
+import okImage from '../img/ok.webp';
+import ngImage from '../img/ng.webp';
+import smileImage from '../img/smileone.webp';
 
 const DEFAULT_EXAM_KEY = defaultExamKey || Object.keys(examSets)[0] || '';
 const questionCountOptions = ['all', 10, 20, 30, 50, 100];
@@ -253,7 +256,7 @@ const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose
       >
         <div className="flex flex-col items-center text-center gap-3">
           <img
-            src={`${import.meta.env.BASE_URL}img/${lastAnswerCorrect ? 'ok.webp' : 'ng.webp'}`}
+            src={lastAnswerCorrect ? okImage : ngImage}
             alt={lastAnswerCorrect ? '正解' : '不正解'}
             className="w-32 h-32 object-contain"
           />
@@ -340,11 +343,7 @@ const ExplanationPopup = ({ open, detail, onClose, onNext }) =>
 const BannerAd = ({ marginClass = '' }) => (
   <div className={`flex justify-center ${marginClass}`}>
     <a href="https://plus1jp.com/" target="_blank" rel="noreferrer">
-      <img
-        src={`${import.meta.env.BASE_URL}img/smileone.webp`}
-        alt="smileone"
-        className="w-full max-w-md rounded-2xl shadow-md border border-slate-200"
-      />
+      <img src={smileImage} alt="smileone" className="w-full max-w-md rounded-2xl shadow-md border border-slate-200" />
     </a>
   </div>
 );
