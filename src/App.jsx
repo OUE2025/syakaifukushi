@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   CheckCircle2,
-  ChevronRight,
   GraduationCap,
   Heart,
   RefreshCcw,
@@ -10,27 +9,28 @@ import {
   Star,
   XCircle,
 } from 'lucide-react';
-import { questions as rawQuestions } from './questions';
+// 試験回は questions*.js の自動収集結果（examSets）から取得し、defaultExamKey で最新回を選択
+import { examSets, defaultExamKey } from './questions';
 
-const categories = ['すべて', ...new Set(rawQuestions.map((q) => q.category))];
+const DEFAULT_EXAM_KEY = defaultExamKey || Object.keys(examSets)[0] || '';
 const questionCountOptions = ['all', 10, 20, 30, 50, 100];
 
 const praiseMessages = [
   'その調子！素晴らしい知識です✨',
-  '正解！あなたは社会福祉士の素質十分です🧠',
-  'お見事！自信を持って進みましょう。',
-  'ピンポン！専門用語もバッチリです。',
+  '正解です。あなたは社会福祉士の素質十分です🧠',
+  'お見事！自信を持って進みましょう🎉',
+  'ピンポーン！専門用語もバッチリです👌',
   '完璧です！合格が近づいていますよ🌸',
 ];
 
 const retryMessages = [
-  '惜しい！次こそは正解を掴みましょう。',
+  '惜しい！次こそは正解を掴みましょう🔥',
   '間違いは成長の糧です。復習が大事です📚',
-  'どんまい。解説を確認して知識を定着させよう🌱',
-  '焦らず一歩ずつ！次はきっと大丈夫です💪',
+  'どんまい！解説を確認して知識を定着させよう🌱',
+  '焦らず一歩ずつ。次はきっと大丈夫です💪',
 ];
 
-const circledDigits = ['⓪','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮','⑯','⑰','⑱','⑲','⑳'];
+const circledDigits = ['⓪', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳'];
 const formatCircleNumber = (n) => (n >= 0 && n < circledDigits.length ? circledDigits[n] : `${n}.`);
 
 const shuffleArray = (arr) => {
@@ -48,32 +48,93 @@ const prepareSessionQuestions = (base, filter, countOption) => {
   return shuffleArray(base).slice(0, targetCount);
 };
 
-const Header = ({ hasStarted, onOpenSettings }) => (
+const NoticeModal = ({ open, onClose }) =>
+  open ? (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-3xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg md:text-xl font-bold text-slate-900">注意事項・免責事項</h2>
+        </div>
+
+        <section className="space-y-2 text-sm md:text-base text-slate-800">
+          <h3 className="text-base md:text-lg font-bold text-slate-900 border-l-4 border-indigo-500 pl-2">注意事項</h3>
+          <p>本アプリは、社会福祉士国家試験の学習を目的とした試供用サンプルアプリです。提供内容および動作について、以下の点をご理解のうえご利用ください。</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>本アプリは、予告なく内容の変更・修正・追加・削除、または提供を中止・廃止する場合があります。</li>
+            <li>本アプリは試供用のため、機能の完全性・正確性・継続的な提供を保証するものではありません。</li>
+            <li>本アプリの利用に関して、個別の要望、操作方法、学習内容に関するお問い合わせには対応しておりません。</li>
+            <li>本アプリは、特定の合格や成績向上を保証するものではありません。</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2 text-sm md:text-base text-slate-800">
+          <h3 className="text-base md:text-lg font-bold text-slate-900 border-l-4 border-indigo-500 pl-2">問題内容について</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>本アプリに掲載されている問題および選択肢は、学習用サンプルとして提供しているものです。</li>
+            <li>正確性・最新性には配慮していますが、内容の完全な正確性を保証するものではありません。</li>
+            <li>実際の試験内容や出題傾向については、必ず公式情報をご確認ください。</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2 text-sm md:text-base text-slate-800">
+          <h3 className="text-base md:text-lg font-bold text-slate-900 border-l-4 border-indigo-500 pl-2">免責事項</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>本アプリの利用、または利用できなかったことによって生じた、いかなる損害（直接的・間接的を問わず）についても、一切の責任を負いません。</li>
+            <li>本アプリの動作不具合、表示エラー、データ消失等についても、責任を負わないものとします。</li>
+            <li>利用者が本アプリを用いて行った学習結果、判断、行動については、すべて利用者自身の責任とします。</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2 text-sm md:text-base text-slate-800">
+          <h3 className="text-base md:text-lg font-bold text-slate-900 border-l-4 border-indigo-500 pl-2">著作権について</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>本アプリ内の文章、構成、デザイン等に関する著作権は、運営者または正当な権利者に帰属します。</li>
+            <li>無断での転載、複製、再配布等は禁止します。</li>
+          </ul>
+        </section>
+
+        <section className="space-y-2 text-sm md:text-base text-slate-800">
+          <h3 className="text-base md:text-lg font-bold text-slate-900 border-l-4 border-indigo-500 pl-2">その他</h3>
+          <p>本注意事項および免責事項は、予告なく変更される場合があります。変更後は、本アプリ上に掲載された時点から効力を生じるものとします。</p>
+        </section>
+
+        <div className="flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold border border-slate-200 shadow-sm"
+          >
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+const Header = ({ hasStarted, examLabel, onOpenNotice }) => (
   <header
     className={`relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center flex-shrink-0 ${
       hasStarted ? 'px-4 py-3 md:px-5 md:py-3' : 'p-5 md:p-6'
     }`}
   >
     {!hasStarted && (
-      <a
-        href={`${import.meta.env.BASE_URL}notice.html`}
-        target="_blank"
-        rel="noreferrer"
-        className="absolute top-4 right-4 text-xs md:text-sm font-semibold bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-full px-3 py-1"
+      <button
+        type="button"
+        onClick={() => onOpenNotice?.()}
+        className="absolute top-4 right-4 text-xs md:text-sm font-semibold bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-full px-3 py-1 md:top-5 md:right-5"
       >
         注意事項・免責事項
-      </a>
+      </button>
     )}
     {!hasStarted && (
       <>
-        <div className="flex justify-center mb-2 mt-2 md:mt-0">
+        <div className="flex justify-center mb-2 mt-3 md:mt-0">
           <GraduationCap size={40} className="text-indigo-200" />
         </div>
-        <h1 className="text-2xl font-bold">第37回 社会福祉士国家試験</h1>
+        <h1 className="text-2xl font-bold">社会福祉士国家試験</h1>
         <p className="text-indigo-100 opacity-90 text-sm md:text-base">過去問演習クエスト</p>
       </>
     )}
-    {hasStarted && <h1 className="text-lg md:text-xl font-bold">第37回 社会福祉士国家試験</h1>}
+    {hasStarted && <h1 className="text-lg md:text-xl font-bold">{examLabel ? `${examLabel} 社会福祉士国家試験` : '社会福祉士国家試験'}</h1>}
   </header>
 );
 
@@ -149,7 +210,7 @@ const SettingsModal = ({
     </div>
   ) : null;
 
-const FilterBar = ({ filter, onChangeFilter, currentIndex, total, score, timeLimitEnabled, remainingSeconds, onAbort, disableFilter }) => (
+const FilterBar = ({ filter, currentIndex, total, score, timeLimitEnabled, remainingSeconds, onAbort }) => (
   <div className="p-3 md:p-4 bg-indigo-50 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 flex-shrink-0">
     <div className="flex items-center gap-2">
       <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">科目:</span>
@@ -176,7 +237,7 @@ const FilterBar = ({ filter, onChangeFilter, currentIndex, total, score, timeLim
         onClick={onAbort}
         className="px-3 py-1 rounded-full bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-semibold"
       >
-        途中でやめる
+        途中でやめてスタートへ
       </button>
     </div>
   </div>
@@ -194,7 +255,7 @@ const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose
           <img
             src={`${import.meta.env.BASE_URL}img/${lastAnswerCorrect ? 'ok.webp' : 'ng.webp'}`}
             alt={lastAnswerCorrect ? '正解' : '不正解'}
-            className="w-28 h-28 object-contain"
+            className="w-32 h-32 object-contain"
           />
           <div className="space-y-2">
             <p className="text-sm text-slate-700 leading-relaxed">{encouragement}</p>
@@ -235,11 +296,11 @@ const FeedbackPopup = ({ open, encouragement, lastAnswerCorrect, detail, onClose
     </div>
   ) : null;
 
-const ExplanationPopup = ({ open, detail, onClose }) =>
+const ExplanationPopup = ({ open, detail, onClose, onNext }) =>
   open && detail ? (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
       <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4">
-        <div className="text-sm text-slate-500">解説</div>
+        <div className="text-sm text-slate-500">問題 {detail.question?.id ?? ''}</div>
         <div className="text-base font-bold text-slate-800 leading-relaxed max-h-32 overflow-auto">
           {detail.question.question}
         </div>
@@ -255,15 +316,19 @@ const ExplanationPopup = ({ open, detail, onClose }) =>
           </div>
           <div className="pt-2">
             <div className="font-semibold text-slate-900 mb-1">解説</div>
-            <div className="text-slate-700 leading-relaxed">
-              {detail.question.explanation || '解説は準備中です。'}
-            </div>
+            <div className="text-slate-700 leading-relaxed">{detail.question.explanation || '解説は準備中です。'}</div>
           </div>
         </div>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onNext}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
+          >
+            次の問題へ
+          </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold border border-slate-200 shadow-sm"
           >
             閉じる
           </button>
@@ -284,17 +349,42 @@ const BannerAd = ({ marginClass = '' }) => (
   </div>
 );
 
-const StartScreen = ({ totalCount, filter, onChangeFilter, onStart, onOpenSettings, timeLimitEnabled }) => (
+const StartScreen = ({
+  totalCount,
+  filter,
+  onChangeFilter,
+  onStart,
+  onOpenSettings,
+  timeLimitEnabled,
+  examKey,
+  examOptions,
+  onChangeExam,
+  categories,
+}) => (
   <div className="text-center py-10 md:py-14 h-full flex flex-col items-center">
-    <div className="flex flex-col items-center space-y-5">
+    <div className="flex flex-col items-center gap-5">
       <div className="relative inline-block">
         <div className="absolute inset-0 bg-indigo-400 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-        <div className="relative bg-white p-4 rounded-full border-4 border-indigo-400 shadow-xl inline-flex items-center justify-center w-24 h-24 text-4xl text-indigo-600">
-          <BookOpen size={32} />
+        <div className="relative bg-white p-4 rounded-full border-4 border-indigo-400 shadow-xl inline-flex items-center justify-center w-20 h-20 text-3xl text-indigo-600">
+          <BookOpen size={28} />
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h2 className="text-xl md:text-2xl font-black text-slate-800">演習をはじめよう</h2>
+        <div className="flex flex-col items-center gap-2">
+          <label className="text-xs font-semibold text-slate-600">試験回を選択</label>
+          <select
+            value={examKey}
+            onChange={(e) => onChangeExam(e.target.value)}
+            className="bg-white border border-indigo-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            {examOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex flex-col items-center gap-2">
           <label className="text-xs font-semibold text-slate-600">科目を選択</label>
           <select
@@ -340,8 +430,6 @@ const QuestionScreen = ({
   handleOptionToggle,
   handleSubmit,
   handleNext,
-  currentQuestionIndex,
-  activeLength,
 }) => {
   const questionRef = useRef(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
@@ -359,7 +447,7 @@ const QuestionScreen = ({
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      <div className="space-y-2 flex-shrink-0 relative pb-8">
+      <div className="space-y-2 flex-shrink-0 relative pb-10">
         <div className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-widest">
           {currentQuestion.category}
         </div>
@@ -367,11 +455,11 @@ const QuestionScreen = ({
           ref={questionRef}
           className="text-base md:text-lg font-bold leading-snug max-h-16 overflow-auto pr-1 md:max-h-none md:overflow-visible"
         >
-          <span className="font-extrabold mr-1">問題 {currentQuestion.id}:</span>
+          <span className="font-extrabold mr-1">問 {currentQuestion.id}:</span>
           <span>{currentQuestion.question}</span>
         </div>
         {showScrollHint && (
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 pointer-events-none">▼</div>
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-slate-400 pointer-events-none">▼</div>
         )}
         {isMultiple && (
           <p className="text-rose-500 text-sm font-bold flex items-center gap-1">
@@ -453,7 +541,7 @@ const ResultScreen = ({ score, accuracy, rank, onRestart, onBackToStart }) => (
 
     <div className="space-y-2">
       <h2 className="text-3xl font-black text-slate-800">お疲れ様でした！</h2>
-      <p className="text-slate-500">第37回国家試験 演習クエスト完了</p>
+      <p className="text-slate-500">国家試験演習クエスト完了！</p>
     </div>
 
     <div className="grid grid-cols-2 gap-4">
@@ -487,12 +575,13 @@ const ResultScreen = ({ score, accuracy, rank, onRestart, onBackToStart }) => (
       onClick={onBackToStart}
       className="w-full bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 rounded-2xl border border-slate-200 transition-all"
     >
-      スタート画面に戻る（設定変更）
+      スタート画面に戻る（設定変更など）
     </button>
   </div>
 );
 
 const App = () => {
+  const [examKey, setExamKey] = useState(DEFAULT_EXAM_KEY);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState([]);
   const [score, setScore] = useState(0);
@@ -514,15 +603,27 @@ const App = () => {
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const [popupDetail, setPopupDetail] = useState(null);
   const [showExplanationPopup, setShowExplanationPopup] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
+
+  const rawQuestions = useMemo(() => examSets[examKey] || examSets[DEFAULT_EXAM_KEY] || [], [examKey]);
+  const categories = useMemo(() => ['すべて', ...Array.from(new Set(rawQuestions.map((q) => q.category)))], [rawQuestions]);
 
   const filteredQuestions = useMemo(
     () => (filter === 'すべて' ? rawQuestions : rawQuestions.filter((q) => q.category === filter)),
-    [filter],
+    [filter, rawQuestions],
   );
 
   const activeQuestions = hasStarted ? sessionQuestions : filteredQuestions;
   const currentQuestion = activeQuestions[currentQuestionIndex] ?? null;
   const isMultiple = currentQuestion?.correct.length > 1;
+  const examOptions = useMemo(() => Object.keys(examSets), []);
+
+  useEffect(() => {
+    resetQuiz();
+    setFilter('すべて');
+    setHasStarted(false);
+    setIsFinished(false);
+  }, [examKey]);
 
   useEffect(() => {
     resetQuiz();
@@ -623,7 +724,7 @@ const App = () => {
     const ratio = score / total;
     if (ratio === 1) return { title: '社会福祉士マスター', icon: '👑', color: 'text-yellow-500' };
     if (ratio >= 0.8) return { title: 'ベテランソーシャルワーカー', icon: '💎', color: 'text-blue-500' };
-    if (ratio >= 0.6) return { title: '合格圏のルーキー', icon: '🌟', color: 'text-green-500' };
+    if (ratio >= 0.6) return { title: '合格圏内ルーキー', icon: '🌟', color: 'text-green-500' };
     return { title: '社会福祉士の卵', icon: '🥚', color: 'text-gray-500' };
   };
 
@@ -691,19 +792,17 @@ const App = () => {
       />
 
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 h-[calc(100vh-2rem)] md:h-[calc(100vh-3rem)] flex flex-col">
-        <Header hasStarted={hasStarted} onOpenSettings={() => !hasStarted && setShowSettings(true)} />
+        <Header hasStarted={hasStarted} examLabel={examKey} onOpenNotice={() => setShowNotice(true)} />
 
         {hasStarted && !isFinished && (
           <FilterBar
             filter={filter}
-            onChangeFilter={setFilter}
             currentIndex={currentQuestionIndex}
             total={activeQuestions.length || 1}
             score={score}
             timeLimitEnabled={timeLimitEnabled}
             remainingSeconds={remainingSeconds}
             onAbort={handleBackToStart}
-            disableFilter
           />
         )}
 
@@ -721,7 +820,17 @@ const App = () => {
           onOpenExplanation={() => setShowExplanationPopup(true)}
         />
 
-        <ExplanationPopup open={showExplanationPopup} detail={popupDetail} onClose={() => setShowExplanationPopup(false)} />
+        <ExplanationPopup
+          open={showExplanationPopup}
+          detail={popupDetail}
+          onClose={() => setShowExplanationPopup(false)}
+          onNext={() => {
+            setShowExplanationPopup(false);
+            if (!isFinished) {
+              handleNext();
+            }
+          }}
+        />
 
         <main className="p-4 md:p-6 flex-1 overflow-auto">
           {!hasStarted ? (
@@ -732,6 +841,10 @@ const App = () => {
               onStart={handleStart}
               onOpenSettings={() => setShowSettings(true)}
               timeLimitEnabled={timeLimitEnabled}
+              examKey={examKey}
+              examOptions={examOptions}
+              onChangeExam={setExamKey}
+              categories={categories}
             />
           ) : !isFinished && currentQuestion ? (
             <QuestionScreen
@@ -742,8 +855,6 @@ const App = () => {
               handleOptionToggle={handleOptionToggle}
               handleSubmit={() => handleSubmit(false)}
               handleNext={handleNext}
-              currentQuestionIndex={currentQuestionIndex}
-              activeLength={activeQuestions.length || 1}
             />
           ) : (
             <ResultScreen score={score} accuracy={accuracy} rank={getRank()} onRestart={resetQuiz} onBackToStart={handleBackToStart} />
@@ -752,7 +863,7 @@ const App = () => {
 
         {hasStarted && !isFinished && (
           <footer className="px-6 py-4 bg-slate-50 text-[10px] text-slate-400 text-center border-t border-slate-100 italic">
-            ※問題文は第37回社会福祉士国家試験を参考にした練習用データです。
+            ※問題文は公開されている国家試験を参考にした練習用データです。
           </footer>
         )}
       </div>
@@ -766,6 +877,8 @@ const App = () => {
           <span className="text-slate-400">応援しています！</span>
         </div>
       </div>
+
+      <NoticeModal open={showNotice} onClose={() => setShowNotice(false)} />
     </div>
   );
 };

@@ -1,0 +1,11 @@
+# Normalize line endings and enforce UTF-8 text to prevent mojibake
+* text=auto eol=lf
+
+*.{js,jsx,ts,tsx,css,html,json,md,txt} text working-tree-encoding=utf-8
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
