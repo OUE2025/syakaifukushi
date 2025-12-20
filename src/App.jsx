@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   CheckCircle2,
@@ -655,6 +655,16 @@ const App = () => {
       return new Set([DEFAULT_EXAM_KEY]);
     }
   });
+  const mainContentRef = useRef(null);
+
+  const scrollMainToTop = useCallback(() => {
+    const target = mainContentRef.current;
+    if (target) {
+      target.scrollTo({ top: 0, behavior: 'auto' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, []);
 
   const rawQuestions = useMemo(() => examSets[examKey] || examSets[DEFAULT_EXAM_KEY] || [], [examKey]);
   const categories = useMemo(() => ['すべて', ...Array.from(new Set(rawQuestions.map((q) => q.category)))], [rawQuestions]);
@@ -803,6 +813,7 @@ const App = () => {
   };
 
   const handleNext = () => {
+    scrollMainToTop();
     if (currentQuestionIndex < activeQuestions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
       setSelectedOptions([]);
@@ -862,6 +873,10 @@ const App = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, [timeLimitEnabled, currentQuestion, showResult, isFinished, hasStarted, timeLimitSeconds]);
+
+  useEffect(() => {
+    scrollMainToTop();
+  }, [currentQuestionIndex, hasStarted, isFinished, scrollMainToTop]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 md:p-6 font-sans text-slate-800 overflow-hidden">
@@ -936,7 +951,7 @@ const App = () => {
           }}
         />
 
-        <main className="p-4 md:p-6 flex-1 overflow-auto">
+        <main ref={mainContentRef} className="p-4 md:p-6 flex-1 overflow-auto">
           {!hasStarted ? (
             <StartScreen
               totalCount={displayTotalCount}
